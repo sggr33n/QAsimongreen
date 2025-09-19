@@ -1,19 +1,10 @@
 pipeline {
     agent any
     stages {
-        stage('Clone Repository') {
+        stage('Checkout Repository') {
             steps {
-                git branch: 'main', url: 'https://github.com/sggr33n/QAsimongreen.git'
-            }
-        }
-        stage('Install Terraform') {
-            steps {
-                sh '''
-                wget https://releases.hashicorp.com/terraform/1.5.6/terraform_1.5.6_linux_amd64.zip
-                unzip -o terraform_1.5.6_linux_amd64.zip
-                sudo mv terraform /usr/local/bin/
-                terraform --version
-                '''
+                // Clone the repository to the Jenkins workspace
+                checkout scm
             }
         }
         stage('Terraform Init') {
@@ -26,23 +17,17 @@ pipeline {
                 }
             }
         }
-        stage('Terraform Plan') {
+        stage('Destroy') {
             steps {
-                withCredentials([file(credentialsId: 'gcp-svc-acct', variable: 'GOOGLE_CLOUD_KEYFILE_JSON')]) {
+                dir('./') { // Ensure the correct directory is used
+                    // Manual approval prompt
+                    input message: "Are you sure you want to destroy the resources?", ok: "Yes, Destroy"
+                    withCredentials([file(credentialsId: 'gcp-svc-acct', variable: 'GOOGLE_CLOUD_KEYFILE_JSON')]) {
                     sh '''
                     export GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_CLOUD_KEYFILE_JSON
-                    terraform plan
+                    terraform destroy -auto-approve -lock=false
                     '''
-                }
-            }
-        }
-        stage('Terraform Apply') {
-            steps {
-                withCredentials([file(credentialsId: 'gcp-svc-acct', variable: 'GOOGLE_CLOUD_KEYFILE_JSON')]) {
-                    sh '''
-                    export GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_CLOUD_KEYFILE_JSON
-                    terraform apply -auto-approve
-                    '''
+                    }
                 }
             }
         }
